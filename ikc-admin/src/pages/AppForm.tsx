@@ -35,18 +35,24 @@ export default function AppForm() {
 
   const handleSave = async () => {
     setSaving(true);
-    const data = { ...form, updatedAt: serverTimestamp() };
-    if (isNew) {
-      const ref = await addDoc(collection(db, 'apps'), { ...data, publishedAt: null, downloads: 0 });
-      await addVersionRecord(ref.id);
-      navigate(`/apps/${ref.id}`);
-    } else {
-      await setDoc(doc(db, 'apps', id!), data, { merge: true });
-      await addVersionRecord(id!);
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2000);
+    try {
+      const data = { ...form, updatedAt: serverTimestamp() };
+      if (isNew) {
+        const ref = await addDoc(collection(db, 'apps'), { ...data, publishedAt: null, downloads: 0 });
+        await addVersionRecord(ref.id);
+        navigate(`/apps/${ref.id}`);
+      } else {
+        await setDoc(doc(db, 'apps', id!), data, { merge: true });
+        await addVersionRecord(id!);
+        setSaved(true);
+        setTimeout(() => setSaved(false), 2000);
+      }
+    } catch (err) {
+      console.error('Kaydetme hatası:', err);
+      alert('Kaydetme başarısız. Konsolu kontrol et.');
+    } finally {
+      setSaving(false);
     }
-    setSaving(false);
   };
 
   const addVersionRecord = async (appId: string) => {
@@ -131,7 +137,12 @@ export default function AppForm() {
               <Section title="Medya">
                 <div style={S.uploadRow}>
                   <FileUpload path={`apps/${form.packageName || 'app'}/icons`} label="Uygulama İkonu" accept="image/*" onUploaded={url => set('iconUrl', url)} />
-                  {form.iconUrl && <img src={form.iconUrl} alt="icon" style={S.iconPrev} />}
+                  {form.iconUrl && (
+                    <div style={S.ssWrap}>
+                      <img src={form.iconUrl} alt="icon" style={S.iconPrev} />
+                      <button onClick={() => set('iconUrl', '')} style={S.ssRemove}>×</button>
+                    </div>
+                  )}
                 </div>
                 <FileUpload path={`apps/${form.packageName || 'app'}/screenshots`} label="Ekran Görüntüsü Ekle" accept="image/*" onUploaded={url => set('screenshots', [...form.screenshots, url])} />
                 {form.screenshots.length > 0 && (
@@ -154,10 +165,13 @@ export default function AppForm() {
                   onUploaded={(url, size) => { set('apkUrl', url); if (size) set('apkSize', size); }}
                 />
                 {form.apkUrl && (
-                  <a href={form.apkUrl} target="_blank" rel="noreferrer" style={S.apkLink}>
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
-                    Mevcut APK · {form.apkSize ? `${(form.apkSize / 1024 / 1024).toFixed(1)} MB` : ''}
-                  </a>
+                  <div style={S.apkRow}>
+                    <a href={form.apkUrl} target="_blank" rel="noreferrer" style={S.apkLink}>
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+                      Mevcut APK · {form.apkSize ? `${(form.apkSize / 1024 / 1024).toFixed(1)} MB` : ''}
+                    </a>
+                    <button onClick={() => { set('apkUrl', ''); set('apkSize', 0); }} style={S.ssRemove}>×</button>
+                  </div>
                 )}
               </Section>
 
@@ -285,10 +299,11 @@ const S: Record<string, React.CSSProperties> = {
     fontSize: 12, lineHeight: '1', display: 'flex', alignItems: 'center', justifyContent: 'center',
   },
 
+  apkRow: { display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 },
   apkLink: {
     display: 'inline-flex', alignItems: 'center', gap: 5,
     color: 'var(--accent)', fontSize: 12, fontWeight: 500,
-    textDecoration: 'none', marginTop: 4,
+    textDecoration: 'none',
   },
 
   statsCard: {

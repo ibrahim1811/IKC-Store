@@ -26,22 +26,20 @@ export default function VersionHistory({ appId }: Props) {
   return (
     <table style={styles.table}>
       <thead>
-        <tr>
-          <th>Versiyon</th>
-          <th>Kod</th>
-          <th>Tarih</th>
-          <th>Changelog</th>
-          <th>APK</th>
+        <tr style={{ borderBottom: '1px solid var(--border)' }}>
+          {['Versiyon','Kod','Tarih','Changelog','APK'].map(h => (
+            <th key={h} style={{ padding: '0.625rem 0.875rem', textAlign: 'left', fontSize: 11, fontWeight: 600, color: 'var(--text-2)', letterSpacing: '0.05em', textTransform: 'uppercase' }}>{h}</th>
+          ))}
         </tr>
       </thead>
       <tbody>
         {versions.map(v => (
-          <tr key={v.id}>
-            <td>{v.versionName}</td>
-            <td>{v.versionCode}</td>
-            <td>{v.releasedAt ? new Date((v.releasedAt as unknown as { seconds: number }).seconds * 1000).toLocaleDateString('tr-TR') : '-'}</td>
-            <td style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v.changelog}</td>
-            <td><a href={v.apkUrl} target="_blank" rel="noreferrer" style={styles.link}>İndir</a></td>
+          <tr key={v.id} style={{ borderBottom: '1px solid var(--border)' }}>
+            <td style={styles.td}>{v.versionName}</td>
+            <td style={styles.td}>{v.versionCode}</td>
+            <td style={styles.td}>{v.releasedAt ? new Date((v.releasedAt as unknown as { seconds: number }).seconds * 1000).toLocaleDateString('tr-TR') : '-'}</td>
+            <td style={{ ...styles.td, maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v.changelog}</td>
+            <td style={styles.td}><a href={v.apkUrl} target="_blank" rel="noreferrer" style={styles.link}>İndir</a></td>
           </tr>
         ))}
       </tbody>
@@ -50,6 +48,7 @@ export default function VersionHistory({ appId }: Props) {
 }
 
 const styles: Record<string, React.CSSProperties> = {
-  table: { width: '100%', borderCollapse: 'collapse', background: '#fff', borderRadius: '8px', overflow: 'hidden', boxShadow: '0 1px 8px rgba(0,0,0,0.08)' },
-  link: { color: '#4f46e5', fontWeight: 600 },
+  table: { width: '100%', borderCollapse: 'collapse', background: 'var(--surface)', borderRadius: 'var(--radius)', overflow: 'hidden', border: '1px solid var(--border)' },
+  td: { padding: '0.75rem 0.875rem', fontSize: 13, color: 'var(--text-1)' },
+  link: { color: 'var(--accent)', fontWeight: 600, textDecoration: 'none' },
 };
