@@ -1,0 +1,12 @@
+node_modules/
+.env
+.env.local
+
+# Android keystore ve şifreler — bunu kimseyle paylaşma
+IKCStoreApp/android/app/ikc-release.keystore
+IKCStoreApp/android/keystore.properties
+
+# Build çıktıları
+ikc-admin/dist/
+IKCStoreApp/android/build/
+IKCStoreApp/android/app/build/

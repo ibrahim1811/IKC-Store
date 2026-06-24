@@ -1,0 +1,15 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function isAdmin() {
+      return request.auth != null && request.auth.token.email == 'ikcdeveloper@gmail.com';
+    }
+
+    // APK, ikon, screenshot — sadece admin yükleyebilir, herkes okuyabilir
+    match /apps/{allPaths=**} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+  }
+}

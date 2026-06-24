@@ -1,0 +1,25 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isAdmin() {
+      return request.auth != null && request.auth.token.email == 'ikcdeveloper@gmail.com';
+    }
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    match /apps/{appId} {
+      // Herkes yayındaki uygulamaları okuyabilir
+      allow read: if resource.data.status == 'published' || isAdmin();
+      // Sadece admin yazabilir
+      allow write: if isAdmin();
+
+      match /history/{versionId} {
+        allow read: if isAdmin() || get(/databases/$(database)/documents/apps/$(appId)).data.status == 'published';
+        allow write: if isAdmin();
+      }
+    }
+  }
+}

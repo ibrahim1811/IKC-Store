@@ -1,0 +1,40 @@
+{
+  "project_info": {
+    "project_number": "508538629679",
+    "firebase_url": "https://ikc-store-default-rtdb.firebaseio.com",
+    "project_id": "ikc-store",
+    "storage_bucket": "ikc-store.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:508538629679:android:ab3f2d2531ab410f4b60da",
+        "android_client_info": {
+          "package_name": "com.ikcstoreapp"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "508538629679-ju8433ihs1bguafuhn2su6ra9t1itnm1.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCsH2_iOKfmKmFuNtiZ0J9BpvHLYKGtrNE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "508538629679-ju8433ihs1bguafuhn2su6ra9t1itnm1.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
