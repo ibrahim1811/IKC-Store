@@ -11,15 +11,13 @@ service cloud.firestore {
     }
 
     match /apps/{appId} {
-      // Herkes yayındaki uygulamaları okuyabilir
       allow read: if resource.data.status == 'published' || isAdmin();
-      // Sadece admin yazabilir
       allow write: if isAdmin();
+    }
 
-      match /history/{versionId} {
-        allow read: if isAdmin() || get(/databases/$(database)/documents/apps/$(appId)).data.status == 'published';
-        allow write: if isAdmin();
-      }
+    match /versions/{appId}/history/{versionId} {
+      allow read: if isAdmin() || get(/databases/$(database)/documents/apps/$(appId)).data.status == 'published';
+      allow write: if isAdmin();
     }
   }
 }
