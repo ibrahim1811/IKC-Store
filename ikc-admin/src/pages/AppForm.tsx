@@ -1,9 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import {
-  doc, getDoc, setDoc, addDoc, collection, serverTimestamp,
-  Timestamp
-} from 'firebase/firestore';
+import { doc, getDoc, setDoc, addDoc, collection, serverTimestamp, Timestamp } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import type { App } from '../lib/types';
 import FileUpload from '../components/FileUpload';
@@ -21,6 +18,7 @@ export default function AppForm() {
   const isNew = id === 'new';
   const [form, setForm] = useState<Omit<App, 'id'>>(emptyApp);
   const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
   const [tab, setTab] = useState<'info' | 'versions'>('info');
   const navigate = useNavigate();
 
@@ -39,15 +37,14 @@ export default function AppForm() {
     setSaving(true);
     const data = { ...form, updatedAt: serverTimestamp() };
     if (isNew) {
-      const ref = await addDoc(collection(db, 'apps'), {
-        ...data, publishedAt: null, downloads: 0
-      });
-      // yeni sürüm kaydı oluştur
+      const ref = await addDoc(collection(db, 'apps'), { ...data, publishedAt: null, downloads: 0 });
       await addVersionRecord(ref.id);
       navigate(`/apps/${ref.id}`);
     } else {
       await setDoc(doc(db, 'apps', id!), data, { merge: true });
       await addVersionRecord(id!);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
     }
     setSaving(false);
   };
@@ -63,84 +60,123 @@ export default function AppForm() {
     });
   };
 
-  const toggleStatus = () =>
-    set('status', form.status === 'published' ? 'draft' : 'published');
+  const isPublished = form.status === 'published';
 
   return (
-    <div style={styles.container}>
-      <div style={styles.header}>
-        <button onClick={() => navigate('/')} style={styles.back}>← Geri</button>
-        <h2>{isNew ? 'Yeni Uygulama' : form.name}</h2>
-        <div style={styles.actions}>
-          <button onClick={toggleStatus} style={{
-            ...styles.statusBtn,
-            background: form.status === 'published' ? '#f59e0b' : '#22c55e'
-          }}>
-            {form.status === 'published' ? 'Taslağa Al' : 'Yayına Al'}
+    <div style={S.page}>
+      {/* Header */}
+      <div style={S.header}>
+        <button onClick={() => navigate('/')} style={S.back}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+          Uygulamalar
+        </button>
+
+        <h1 style={S.heading}>{isNew ? 'Yeni Uygulama' : form.name || 'Düzenle'}</h1>
+
+        <div style={S.actions}>
+          <button
+            onClick={() => set('status', isPublished ? 'draft' : 'published')}
+            style={{ ...S.statusBtn, ...(isPublished ? S.statusDraft : S.statusPublish) }}
+          >
+            {isPublished ? (
+              <><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>Taslağa Al</>
+            ) : (
+              <><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>Yayına Al</>
+            )}
           </button>
-          <button onClick={handleSave} disabled={saving} style={styles.saveBtn}>
-            {saving ? 'Kaydediliyor...' : 'Kaydet'}
+
+          <button onClick={handleSave} disabled={saving} style={S.saveBtn}>
+            {saving ? <span style={S.btnSpinner} /> : saved ? (
+              <><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>Kaydedildi</>
+            ) : (
+              <><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>Kaydet</>
+            )}
           </button>
         </div>
       </div>
 
+      {/* Tabs */}
       {!isNew && (
-        <div style={styles.tabs}>
-          <button onClick={() => setTab('info')} style={tab === 'info' ? styles.tabActive : styles.tab}>Bilgiler</button>
-          <button onClick={() => setTab('versions')} style={tab === 'versions' ? styles.tabActive : styles.tab}>Versiyon Geçmişi</button>
+        <div style={S.tabs}>
+          <button onClick={() => setTab('info')} style={{ ...S.tab, ...(tab === 'info' ? S.tabActive : {}) }}>Bilgiler</button>
+          <button onClick={() => setTab('versions')} style={{ ...S.tab, ...(tab === 'versions' ? S.tabActive : {}) }}>Versiyon Geçmişi</button>
         </div>
       )}
 
       {tab === 'versions' && !isNew ? (
-        <VersionHistory appId={id!} />
+        <div style={S.content}><VersionHistory appId={id!} /></div>
       ) : (
-        <div style={styles.grid}>
-          <Field label="Uygulama Adı" value={form.name} onChange={v => set('name', v)} />
-          <Field label="Paket Adı" value={form.packageName} onChange={v => set('packageName', v)} placeholder="com.ikc.yolbilen" />
-          <Field label="Kategori" value={form.category} onChange={v => set('category', v)} />
-          <Field label="Versiyon Adı" value={form.currentVersion} onChange={v => set('currentVersion', v)} placeholder="1.0.0" />
-          <Field label="Versiyon Kodu" value={String(form.currentVersionCode)} onChange={v => set('currentVersionCode', Number(v))} type="number" />
-          <div style={styles.fullWidth}>
-            <Field label="Açıklama" value={form.description} onChange={v => set('description', v)} multiline />
-          </div>
-          <div style={styles.fullWidth}>
-            <Field label="Changelog" value={form.changelog} onChange={v => set('changelog', v)} multiline />
-          </div>
-          <div>
-            <FileUpload
-              path={`apps/${form.packageName || 'app'}/icons`}
-              label="İkon"
-              accept="image/*"
-              onUploaded={url => set('iconUrl', url)}
-            />
-            {form.iconUrl && <img src={form.iconUrl} alt="icon" style={styles.preview} />}
-          </div>
-          <div>
-            <FileUpload
-              path={`apps/${form.packageName || 'app'}/apks`}
-              label="APK Dosyası"
-              accept=".apk"
-              onUploaded={(url, size) => { set('apkUrl', url); if (size) set('apkSize', size); }}
-            />
-            {form.apkUrl && <a href={form.apkUrl} target="_blank" rel="noreferrer" style={styles.link}>Mevcut APK</a>}
-          </div>
-          <div style={styles.fullWidth}>
-            <FileUpload
-              path={`apps/${form.packageName || 'app'}/screenshots`}
-              label="Ekran Görüntüsü Ekle"
-              accept="image/*"
-              onUploaded={url => set('screenshots', [...form.screenshots, url])}
-            />
-            <div style={styles.screenshots}>
-              {form.screenshots.map((s, i) => (
-                <div key={i} style={styles.ssWrap}>
-                  <img src={s} alt="" style={styles.screenshot} />
-                  <button
-                    onClick={() => set('screenshots', form.screenshots.filter((_, j) => j !== i))}
-                    style={styles.removeBtn}
-                  >×</button>
+        <div style={S.content}>
+          <div style={S.grid}>
+            {/* Sol kolon */}
+            <div style={S.col}>
+              <Section title="Temel Bilgiler">
+                <Field label="Uygulama Adı" value={form.name} onChange={v => set('name', v)} placeholder="Yolbilen" />
+                <Field label="Paket Adı" value={form.packageName} onChange={v => set('packageName', v)} placeholder="com.ikc.yolbilen" mono />
+                <Field label="Kategori" value={form.category} onChange={v => set('category', v)} placeholder="Navigasyon" />
+                <Field label="Açıklama" value={form.description} onChange={v => set('description', v)} multiline />
+              </Section>
+
+              <Section title="Versiyon">
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                  <Field label="Versiyon Adı" value={form.currentVersion} onChange={v => set('currentVersion', v)} placeholder="1.0.0" mono />
+                  <Field label="Versiyon Kodu" value={String(form.currentVersionCode)} onChange={v => set('currentVersionCode', Number(v))} type="number" mono />
                 </div>
-              ))}
+                <Field label="Değişiklikler (Changelog)" value={form.changelog} onChange={v => set('changelog', v)} multiline />
+              </Section>
+            </div>
+
+            {/* Sağ kolon */}
+            <div style={S.col}>
+              <Section title="Medya">
+                <div style={S.uploadRow}>
+                  <FileUpload path={`apps/${form.packageName || 'app'}/icons`} label="Uygulama İkonu" accept="image/*" onUploaded={url => set('iconUrl', url)} />
+                  {form.iconUrl && <img src={form.iconUrl} alt="icon" style={S.iconPrev} />}
+                </div>
+                <FileUpload path={`apps/${form.packageName || 'app'}/screenshots`} label="Ekran Görüntüsü Ekle" accept="image/*" onUploaded={url => set('screenshots', [...form.screenshots, url])} />
+                {form.screenshots.length > 0 && (
+                  <div style={S.screenshots}>
+                    {form.screenshots.map((s, i) => (
+                      <div key={i} style={S.ssWrap}>
+                        <img src={s} alt="" style={S.ss} />
+                        <button onClick={() => set('screenshots', form.screenshots.filter((_, j) => j !== i))} style={S.ssRemove}>×</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </Section>
+
+              <Section title="APK Dosyası">
+                <FileUpload
+                  path={`apps/${form.packageName || 'app'}/apks`}
+                  label="APK Yükle"
+                  accept=".apk"
+                  onUploaded={(url, size) => { set('apkUrl', url); if (size) set('apkSize', size); }}
+                />
+                {form.apkUrl && (
+                  <a href={form.apkUrl} target="_blank" rel="noreferrer" style={S.apkLink}>
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+                    Mevcut APK · {form.apkSize ? `${(form.apkSize / 1024 / 1024).toFixed(1)} MB` : ''}
+                  </a>
+                )}
+              </Section>
+
+              {/* Stats */}
+              {!isNew && (
+                <div style={S.statsCard}>
+                  <div style={S.statItem}>
+                    <span style={S.statVal}>{form.downloads ?? 0}</span>
+                    <span style={S.statLabel}>İndirme</span>
+                  </div>
+                  <div style={S.statDivider} />
+                  <div style={S.statItem}>
+                    <span className={`badge ${isPublished ? 'badge-published' : 'badge-draft'}`}>
+                      {isPublished ? 'Yayında' : 'Taslak'}
+                    </span>
+                    <span style={S.statLabel}>Durum</span>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -149,41 +185,122 @@ export default function AppForm() {
   );
 }
 
-function Field({ label, value, onChange, multiline, type, placeholder }: {
-  label: string; value: string; onChange: (v: string) => void;
-  multiline?: boolean; type?: string; placeholder?: string;
-}) {
-  const common = {
-    padding: '0.6rem', border: '1px solid #ddd', borderRadius: '6px',
-    fontSize: '0.95rem', width: '100%', boxSizing: 'border-box' as const,
-  };
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
-      <label style={{ fontWeight: 600, fontSize: '0.85rem', color: '#374151' }}>{label}</label>
+    <div style={SS.wrap}>
+      <p style={SS.title}>{title}</p>
+      <div style={SS.body}>{children}</div>
+    </div>
+  );
+}
+const SS: Record<string, React.CSSProperties> = {
+  wrap: { marginBottom: '1rem' },
+  title: { fontSize: 11, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '0.75rem' },
+  body: { background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.875rem' },
+};
+
+function Field({ label, value, onChange, multiline, type, placeholder, mono }: {
+  label: string; value: string; onChange: (v: string) => void;
+  multiline?: boolean; type?: string; placeholder?: string; mono?: boolean;
+}) {
+  const inputStyle: React.CSSProperties = mono ? { fontFamily: 'var(--font-mono)', fontSize: 12 } : {};
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem' }}>
+      <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-2)', letterSpacing: '0.02em' }}>{label}</label>
       {multiline
-        ? <textarea value={value} onChange={e => onChange(e.target.value)} style={{ ...common, minHeight: '80px', resize: 'vertical' }} />
-        : <input type={type ?? 'text'} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} style={common} />
+        ? <textarea value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} style={inputStyle} />
+        : <input type={type ?? 'text'} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} style={inputStyle} />
       }
     </div>
   );
 }
 
-const styles: Record<string, React.CSSProperties> = {
-  container: { padding: '2rem', maxWidth: '900px' },
-  header: { display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem' },
-  back: { background: 'none', border: 'none', cursor: 'pointer', fontSize: '1rem', color: '#4f46e5' },
-  actions: { marginLeft: 'auto', display: 'flex', gap: '0.5rem' },
-  saveBtn: { padding: '0.6rem 1.2rem', background: '#4f46e5', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer' },
-  statusBtn: { padding: '0.6rem 1.2rem', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer' },
-  tabs: { display: 'flex', gap: '0.5rem', marginBottom: '1.5rem', borderBottom: '1px solid #e5e7eb', paddingBottom: '0.5rem' },
-  tab: { padding: '0.5rem 1rem', background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', borderRadius: '6px' },
-  tabActive: { padding: '0.5rem 1rem', background: '#eef2ff', border: 'none', cursor: 'pointer', color: '#4f46e5', fontWeight: 600, borderRadius: '6px' },
-  grid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' },
-  fullWidth: { gridColumn: '1 / -1' },
-  preview: { width: 64, height: 64, borderRadius: '12px', objectFit: 'cover', marginTop: '0.5rem' },
-  link: { display: 'block', marginTop: '0.5rem', color: '#4f46e5', fontSize: '0.85rem' },
-  screenshots: { display: 'flex', gap: '0.5rem', marginTop: '0.5rem', flexWrap: 'wrap' },
+const S: Record<string, React.CSSProperties> = {
+  page: { padding: '2rem', maxWidth: 960 },
+  header: { display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem', flexWrap: 'wrap' },
+  back: {
+    display: 'inline-flex', alignItems: 'center', gap: 5,
+    background: 'none', border: 'none', cursor: 'pointer',
+    color: 'var(--text-3)', fontSize: 13,
+    transition: 'color var(--transition)',
+  },
+  heading: { fontSize: 20, fontWeight: 700, color: 'var(--text-1)', letterSpacing: '-0.03em', flex: 1 },
+  actions: { display: 'flex', gap: '0.5rem', marginLeft: 'auto' },
+
+  statusBtn: {
+    display: 'inline-flex', alignItems: 'center', gap: 5,
+    padding: '0.5rem 0.875rem',
+    border: '1px solid',
+    borderRadius: 'var(--radius-sm)',
+    fontFamily: 'var(--font-ui)', fontSize: 12, fontWeight: 600,
+    cursor: 'pointer',
+  },
+  statusPublish: { background: 'rgba(74,222,128,0.08)', borderColor: 'rgba(74,222,128,0.25)', color: 'var(--success)' },
+  statusDraft: { background: 'rgba(252,211,77,0.08)', borderColor: 'rgba(252,211,77,0.25)', color: 'var(--warning)' },
+
+  saveBtn: {
+    display: 'inline-flex', alignItems: 'center', gap: 5,
+    padding: '0.5rem 1rem',
+    background: 'var(--accent)',
+    color: '#fff', border: 'none',
+    borderRadius: 'var(--radius-sm)',
+    fontFamily: 'var(--font-ui)', fontSize: 12, fontWeight: 600,
+    cursor: 'pointer',
+    boxShadow: '0 0 14px var(--accent-glow)',
+  },
+  btnSpinner: {
+    width: 14, height: 14,
+    border: '2px solid rgba(255,255,255,0.3)',
+    borderTopColor: '#fff',
+    borderRadius: '50%',
+    animation: 'spin 0.7s linear infinite',
+    display: 'inline-block',
+  },
+
+  tabs: { display: 'flex', gap: '0.25rem', marginBottom: '1.25rem' },
+  tab: {
+    padding: '0.45rem 0.875rem',
+    background: 'none', border: '1px solid var(--border)',
+    borderRadius: 'var(--radius-sm)',
+    color: 'var(--text-2)', fontSize: 13, fontWeight: 500,
+    cursor: 'pointer',
+    fontFamily: 'var(--font-ui)',
+  },
+  tabActive: { background: 'var(--accent-dim)', borderColor: 'rgba(167,139,250,0.3)', color: 'var(--accent)' },
+
+  content: { },
+  grid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', alignItems: 'start' },
+  col: { display: 'flex', flexDirection: 'column' },
+
+  uploadRow: { display: 'flex', alignItems: 'flex-start', gap: '1rem' },
+  iconPrev: { width: 52, height: 52, borderRadius: 10, objectFit: 'cover', flexShrink: 0, border: '1px solid var(--border)' },
+  screenshots: { display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 4 },
   ssWrap: { position: 'relative' },
-  screenshot: { width: 80, height: 140, objectFit: 'cover', borderRadius: '6px' },
-  removeBtn: { position: 'absolute', top: 2, right: 2, background: 'rgba(0,0,0,0.5)', color: '#fff', border: 'none', borderRadius: '99px', width: 20, height: 20, cursor: 'pointer', fontSize: '0.8rem', lineHeight: '1' },
+  ss: { width: 64, height: 110, objectFit: 'cover', borderRadius: 6, border: '1px solid var(--border)' },
+  ssRemove: {
+    position: 'absolute', top: 2, right: 2,
+    background: 'rgba(0,0,0,0.7)', color: '#fff',
+    border: 'none', borderRadius: '50%',
+    width: 18, height: 18, cursor: 'pointer',
+    fontSize: 12, lineHeight: '1', display: 'flex', alignItems: 'center', justifyContent: 'center',
+  },
+
+  apkLink: {
+    display: 'inline-flex', alignItems: 'center', gap: 5,
+    color: 'var(--accent)', fontSize: 12, fontWeight: 500,
+    textDecoration: 'none', marginTop: 4,
+  },
+
+  statsCard: {
+    background: 'var(--card)',
+    border: '1px solid var(--border)',
+    borderRadius: 'var(--radius-md)',
+    padding: '1.25rem',
+    display: 'flex', alignItems: 'center', gap: '1.5rem',
+    marginTop: 0,
+  },
+  statItem: { display: 'flex', flexDirection: 'column', gap: 4 },
+  statVal: { fontSize: 22, fontWeight: 700, color: 'var(--text-1)', letterSpacing: '-0.03em' },
+  statLabel: { fontSize: 11, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.05em' },
+  statDivider: { width: 1, height: 36, background: 'var(--border)' },
 };
