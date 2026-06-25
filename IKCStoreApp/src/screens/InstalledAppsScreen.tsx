@@ -1,6 +1,9 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { View, FlatList, Text, StyleSheet, ActivityIndicator, RefreshControl } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import notifee, { AndroidImportance } from '@notifee/react-native';
+import { View, FlatList, Text, StyleSheet, ActivityIndicator, RefreshControl, StatusBar } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import type { TabParamList } from '../navigation/types';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import InstalledApps from 'react-native-installed-apps';
 import { fetchPublishedApps, type AppData } from '../services/firebase';
@@ -17,6 +20,7 @@ export default function InstalledAppsScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const nav = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const tabNav = useNavigation<BottomTabNavigationProp<TabParamList>>();
 
   const load = useCallback(async () => {
     const [storeApps, deviceApps] = await Promise.all([
@@ -40,28 +44,88 @@ export default function InstalledAppsScreen() {
 
   useEffect(() => { load(); }, [load]);
 
-  if (loading) return <ActivityIndicator style={styles.center} size="large" color="#4f46e5" />;
+  const updateCount = apps.filter(a => a.needsUpdate).length;
+  const notifiedRef = useRef(false);
+
+  useEffect(() => {
+    tabNav.setOptions({ tabBarBadge: updateCount > 0 ? updateCount : undefined });
+  }, [updateCount, tabNav]);
+
+  useEffect(() => {
+    if (updateCount === 0 || notifiedRef.current) return;
+    notifiedRef.current = true;
+    (async () => {
+      await notifee.createChannel({ id: 'updates', name: 'Güncellemeler', importance: AndroidImportance.HIGH });
+      await notifee.displayNotification({
+        title: 'Güncellemeler mevcut',
+        body: `${updateCount} uygulamanın yeni sürümü var.`,
+        android: { channelId: 'updates', smallIcon: 'ic_launcher' },
+      });
+    })().catch(() => {});
+  }, [updateCount]);
+
+  if (loading) return (
+    <View style={styles.loadWrap}>
+      <StatusBar barStyle="light-content" backgroundColor="#07070F" />
+      <ActivityIndicator size="large" color="#6366F1" />
+    </View>
+  );
 
   return (
-    <FlatList
-      data={apps}
-      keyExtractor={a => a.id}
-      contentContainerStyle={styles.list}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} />}
-      ListEmptyComponent={<Text style={styles.empty}>Yüklü IKC uygulaması bulunamadı.</Text>}
-      renderItem={({ item }) => (
-        <AppCard
-          app={item}
-          badge={item.needsUpdate ? 'Güncelle' : undefined}
-          onPress={() => nav.navigate('AppDetail', { appId: item.id })}
-        />
-      )}
-    />
+    <View style={styles.container}>
+      <StatusBar barStyle="light-content" backgroundColor="#07070F" />
+      <FlatList
+        data={apps}
+        keyExtractor={a => a.id}
+        contentContainerStyle={styles.list}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => { setRefreshing(true); load(); }}
+            tintColor="#6366F1"
+            colors={['#6366F1']}
+          />
+        }
+        ListHeaderComponent={
+          apps.length > 0 ? (
+            <Text style={styles.sectionLabel}>
+              {updateCount > 0 ? `${updateCount} güncelleme mevcut` : `${apps.length} uygulama yüklü`}
+            </Text>
+          ) : null
+        }
+        ListEmptyComponent={
+          <View style={styles.emptyWrap}>
+            <Text style={styles.emptyIcon}>📱</Text>
+            <Text style={styles.emptyText}>Yüklü IKC uygulaması bulunamadı.</Text>
+          </View>
+        }
+        renderItem={({ item }) => (
+          <AppCard
+            app={item}
+            hasUpdate={item.needsUpdate}
+            badge={item.needsUpdate ? 'Güncelle' : undefined}
+            onPress={() => nav.navigate('AppDetail', { appId: item.id })}
+          />
+        )}
+      />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  list: { padding: 16 },
-  center: { flex: 1 },
-  empty: { textAlign: 'center', color: '#9ca3af', marginTop: 48 },
+  container: { flex: 1, backgroundColor: '#07070F' },
+  loadWrap: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#07070F' },
+  list: { padding: 16, paddingTop: 8 },
+  sectionLabel: {
+    color: '#5A5A78',
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+    marginBottom: 12,
+    marginLeft: 2,
+  },
+  emptyWrap: { alignItems: 'center', paddingTop: 80 },
+  emptyIcon: { fontSize: 48, marginBottom: 12 },
+  emptyText: { color: '#5A5A78', fontSize: 15 },
 });

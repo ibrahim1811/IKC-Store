@@ -1,5 +1,5 @@
 import RNFS from 'react-native-fs';
-import { incrementDownloads } from './firebase';
+import { trackUniqueDownload } from './firebase';
 
 export async function downloadApk(
   appId: string,
@@ -7,8 +7,6 @@ export async function downloadApk(
   onProgress: (percent: number) => void
 ): Promise<string> {
   const destPath = `${RNFS.ExternalDirectoryPath}/${appId}-${Date.now()}.apk`;
-
-  await incrementDownloads(appId);
 
   const download = RNFS.downloadFile({
     fromUrl: apkUrl,
@@ -23,5 +21,6 @@ export async function downloadApk(
   const result = await download.promise;
   if (result.statusCode !== 200) throw new Error('İndirme başarısız');
 
+  await trackUniqueDownload(appId);
   return destPath;
 }

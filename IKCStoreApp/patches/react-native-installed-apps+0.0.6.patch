@@ -1,0 +1,136 @@
+diff --git a/node_modules/react-native-installed-apps/android/build.gradle b/node_modules/react-native-installed-apps/android/build.gradle
+new file mode 100644
+index 0000000..b940f5b
+--- /dev/null
++++ b/node_modules/react-native-installed-apps/android/build.gradle
+@@ -0,0 +1,15 @@
++apply plugin: 'com.android.library'
++
++android {
++    compileSdkVersion 34
++    buildToolsVersion "34.0.0"
++
++    defaultConfig {
++        minSdkVersion 24
++        targetSdkVersion 34
++    }
++}
++
++dependencies {
++    implementation "com.facebook.react:react-android"
++}
+diff --git a/node_modules/react-native-installed-apps/android/src/main/AndroidManifest.xml b/node_modules/react-native-installed-apps/android/src/main/AndroidManifest.xml
+new file mode 100644
+index 0000000..5129804
+--- /dev/null
++++ b/node_modules/react-native-installed-apps/android/src/main/AndroidManifest.xml
+@@ -0,0 +1,3 @@
++<manifest xmlns:android="http://schemas.android.com/apk/res/android"
++    package="com.pusherman.installedapps">
++</manifest>
+diff --git a/node_modules/react-native-installed-apps/android/src/main/java/com/pusherman/installedapps/InstalledAppsModule.java b/node_modules/react-native-installed-apps/android/src/main/java/com/pusherman/installedapps/InstalledAppsModule.java
+new file mode 100644
+index 0000000..a1d7dc5
+--- /dev/null
++++ b/node_modules/react-native-installed-apps/android/src/main/java/com/pusherman/installedapps/InstalledAppsModule.java
+@@ -0,0 +1,55 @@
++package com.pusherman.installedapps;
++
++import android.content.pm.ApplicationInfo;
++import android.content.pm.PackageInfo;
++import android.content.pm.PackageManager;
++
++import com.facebook.react.bridge.Arguments;
++import com.facebook.react.bridge.Promise;
++import com.facebook.react.bridge.ReactApplicationContext;
++import com.facebook.react.bridge.ReactContextBaseJavaModule;
++import com.facebook.react.bridge.ReactMethod;
++import com.facebook.react.bridge.WritableArray;
++import com.facebook.react.bridge.WritableMap;
++
++import java.util.List;
++
++public class InstalledAppsModule extends ReactContextBaseJavaModule {
++
++    public InstalledAppsModule(ReactApplicationContext reactContext) {
++        super(reactContext);
++    }
++
++    @Override
++    public String getName() {
++        return "InstalledAppList";
++    }
++
++    @ReactMethod
++    public void getAll(Promise promise) {
++        getApps(promise);
++    }
++
++    @ReactMethod
++    public void getApps(Promise promise) {
++        try {
++            PackageManager pm = getReactApplicationContext().getPackageManager();
++            List<PackageInfo> packages = pm.getInstalledPackages(0);
++            WritableArray result = Arguments.createArray();
++
++            for (PackageInfo pkg : packages) {
++                if ((pkg.applicationInfo.flags & ApplicationInfo.FLAG_SYSTEM) == 0) {
++                    WritableMap app = Arguments.createMap();
++                    app.putString("packageName", pkg.packageName);
++                    app.putDouble("versionCode", pkg.getLongVersionCode());
++                    app.putString("versionName", pkg.versionName != null ? pkg.versionName : "");
++                    result.pushMap(app);
++                }
++            }
++
++            promise.resolve(result);
++        } catch (Exception e) {
++            promise.reject("ERROR", e.getMessage());
++        }
++    }
++}
+diff --git a/node_modules/react-native-installed-apps/android/src/main/java/com/pusherman/installedapps/InstalledAppsPackage.java b/node_modules/react-native-installed-apps/android/src/main/java/com/pusherman/installedapps/InstalledAppsPackage.java
+new file mode 100644
+index 0000000..8f45fa9
+--- /dev/null
++++ b/node_modules/react-native-installed-apps/android/src/main/java/com/pusherman/installedapps/InstalledAppsPackage.java
+@@ -0,0 +1,23 @@
++package com.pusherman.installedapps;
++
++import com.facebook.react.ReactPackage;
++import com.facebook.react.bridge.NativeModule;
++import com.facebook.react.bridge.ReactApplicationContext;
++import com.facebook.react.uimanager.ViewManager;
++
++import java.util.Arrays;
++import java.util.Collections;
++import java.util.List;
++
++public class InstalledAppsPackage implements ReactPackage {
++
++    @Override
++    public List<NativeModule> createNativeModules(ReactApplicationContext reactContext) {
++        return Arrays.<NativeModule>asList(new InstalledAppsModule(reactContext));
++    }
++
++    @Override
++    public List<ViewManager> createViewManagers(ReactApplicationContext reactContext) {
++        return Collections.emptyList();
++    }
++}
+diff --git a/node_modules/react-native-installed-apps/index.js b/node_modules/react-native-installed-apps/index.js
+index 8076ccb..42d7e3d 100644
+--- a/node_modules/react-native-installed-apps/index.js
++++ b/node_modules/react-native-installed-apps/index.js
+@@ -1,6 +1,9 @@
+ 'use strict';
+-const AppList = require('react-native').NativeModules.InstalledAppList;
++const { NativeModules } = require('react-native');
++const AppList = NativeModules.InstalledAppList;
++const noOp = () => Promise.resolve([]);
+ 
+ module.exports = {
+-  getAll: AppList.getAll
++  getAll: AppList ? AppList.getAll.bind(AppList) : noOp,
++  getApps: AppList ? (AppList.getApps || AppList.getAll).bind(AppList) : noOp,
+ };

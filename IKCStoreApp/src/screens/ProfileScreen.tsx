@@ -1,16 +1,41 @@
-import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import {
+  View, Text, TextInput, TouchableOpacity,
+  StyleSheet, ActivityIndicator, StatusBar, KeyboardAvoidingView, Platform,
+} from 'react-native';
 import auth from '@react-native-firebase/auth';
+import messaging from '@react-native-firebase/messaging';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
+import { saveFcmToken } from '../services/firebase';
 
-// Web client ID — Firebase console'dan alınacak
 GoogleSignin.configure({ webClientId: '508538629679-ju8433ihs1bguafuhn2su6ra9t1itnm1.apps.googleusercontent.com' });
 
-export default function ProfileScreen() {
-  const user = auth().currentUser;
+async function registerFcm() {
+  const status = await messaging().requestPermission();
+  const granted =
+    status === messaging.AuthorizationStatus.AUTHORIZED ||
+    status === messaging.AuthorizationStatus.PROVISIONAL;
+  if (granted) {
+    const token = await messaging().getToken();
+    await saveFcmToken(token);
+    await messaging().subscribeToTopic('updates');
+  }
+}
 
-  if (user) return <LoggedIn user={user} />;
-  return <LoginForm />;
+export default function ProfileScreen() {
+  const [user, setUser] = useState(auth().currentUser);
+
+  useEffect(() => {
+    registerFcm().catch(() => {});
+    return auth().onAuthStateChanged(u => setUser(u));
+  }, []);
+
+  return (
+    <View style={{ flex: 1, backgroundColor: '#07070F' }}>
+      <StatusBar barStyle="light-content" backgroundColor="#07070F" />
+      {user ? <LoggedIn user={user} /> : <LoginForm />}
+    </View>
+  );
 }
 
 function LoggedIn({ user }: { user: { email: string | null; displayName: string | null } }) {
@@ -21,10 +46,16 @@ function LoggedIn({ user }: { user: { email: string | null; displayName: string 
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Hesabım</Text>
-      <Text style={styles.email}>{user.displayName ?? user.email}</Text>
-      {user.email && <Text style={styles.sub}>{user.email}</Text>}
-      <TouchableOpacity style={styles.signOutBtn} onPress={handleSignOut}>
+      <View style={styles.avatar}>
+        <Text style={styles.avatarText}>
+          {(user.displayName ?? user.email ?? '?')[0].toUpperCase()}
+        </Text>
+      </View>
+      <Text style={styles.displayName}>{user.displayName ?? user.email}</Text>
+      {user.displayName && user.email
+        ? <Text style={styles.emailSub}>{user.email}</Text>
+        : null}
+      <TouchableOpacity style={styles.signOutBtn} onPress={handleSignOut} activeOpacity={0.8}>
         <Text style={styles.signOutText}>Çıkış Yap</Text>
       </TouchableOpacity>
     </View>
@@ -48,7 +79,7 @@ function LoginForm() {
         await auth().createUserWithEmailAndPassword(email, password);
       }
     } catch {
-      setError('Giriş başarısız. Bilgileri kontrol et.');
+      setError('E-posta veya şifre hatalı.');
     } finally {
       setLoading(false);
     }
@@ -70,38 +101,163 @@ function LoginForm() {
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>{mode === 'login' ? 'Giriş Yap' : 'Hesap Oluştur'}</Text>
-      <TextInput placeholder="Email" value={email} onChangeText={setEmail} style={styles.input} autoCapitalize="none" keyboardType="email-address" />
-      <TextInput placeholder="Şifre" value={password} onChangeText={setPassword} style={styles.input} secureTextEntry />
-      {error ? <Text style={styles.error}>{error}</Text> : null}
-      <TouchableOpacity style={styles.primaryBtn} onPress={handleEmail} disabled={loading}>
-        {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryBtnText}>{mode === 'login' ? 'Giriş Yap' : 'Kayıt Ol'}</Text>}
-      </TouchableOpacity>
-      <TouchableOpacity style={styles.googleBtn} onPress={handleGoogle} disabled={loading}>
-        <Text style={styles.googleBtnText}>Google ile Giriş</Text>
-      </TouchableOpacity>
-      <TouchableOpacity onPress={() => setMode(mode === 'login' ? 'register' : 'login')}>
-        <Text style={styles.switchText}>
-          {mode === 'login' ? 'Hesabın yok mu? Kayıt ol' : 'Hesabın var mı? Giriş yap'}
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
+      <View style={styles.container}>
+        <Text style={styles.loginTitle}>
+          {mode === 'login' ? 'Giriş Yap' : 'Hesap Oluştur'}
         </Text>
-      </TouchableOpacity>
-    </View>
+        <Text style={styles.loginSub}>IKC Store'a hoş geldin</Text>
+
+        <TextInput
+          placeholder="E-posta"
+          placeholderTextColor="#5A5A78"
+          value={email}
+          onChangeText={setEmail}
+          style={styles.input}
+          autoCapitalize="none"
+          keyboardType="email-address"
+        />
+        <TextInput
+          placeholder="Şifre"
+          placeholderTextColor="#5A5A78"
+          value={password}
+          onChangeText={setPassword}
+          style={styles.input}
+          secureTextEntry
+        />
+
+        {error ? <Text style={styles.errorText}>{error}</Text> : null}
+
+        <TouchableOpacity
+          style={[styles.primaryBtn, loading && { opacity: 0.6 }]}
+          onPress={handleEmail}
+          disabled={loading}
+          activeOpacity={0.85}
+        >
+          {loading
+            ? <ActivityIndicator color="#fff" />
+            : <Text style={styles.primaryBtnText}>{mode === 'login' ? 'Giriş Yap' : 'Kayıt Ol'}</Text>
+          }
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.googleBtn, loading && { opacity: 0.6 }]}
+          onPress={handleGoogle}
+          disabled={loading}
+          activeOpacity={0.85}
+        >
+          <Text style={styles.googleBtnText}>Google ile Giriş</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity onPress={() => setMode(mode === 'login' ? 'register' : 'login')}>
+          <Text style={styles.switchText}>
+            {mode === 'login' ? 'Hesabın yok mu? Kayıt ol' : 'Zaten hesabın var mı? Giriş yap'}
+          </Text>
+        </TouchableOpacity>
+      </View>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 24, justifyContent: 'center', backgroundColor: '#f9fafb' },
-  title: { fontSize: 24, fontWeight: '700', color: '#111', marginBottom: 24, textAlign: 'center' },
-  email: { fontSize: 18, fontWeight: '600', textAlign: 'center', color: '#111' },
-  sub: { color: '#6b7280', textAlign: 'center', marginBottom: 24 },
-  input: { borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 10, padding: 14, marginBottom: 12, fontSize: 15, backgroundColor: '#fff' },
-  error: { color: '#ef4444', marginBottom: 8, textAlign: 'center' },
-  primaryBtn: { backgroundColor: '#4f46e5', borderRadius: 10, padding: 14, alignItems: 'center', marginBottom: 10 },
-  primaryBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
-  googleBtn: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 10, padding: 14, alignItems: 'center', marginBottom: 16 },
-  googleBtnText: { color: '#374151', fontWeight: '600' },
-  signOutBtn: { marginTop: 32, borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 10, padding: 14, alignItems: 'center' },
-  signOutText: { color: '#ef4444', fontWeight: '600' },
-  switchText: { textAlign: 'center', color: '#4f46e5', fontWeight: '600' },
+  container: {
+    flex: 1,
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+    backgroundColor: '#07070F',
+  },
+  avatar: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#1E1E3A',
+    borderWidth: 2,
+    borderColor: '#6366F1',
+    alignSelf: 'center',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  avatarText: {
+    fontSize: 32,
+    fontWeight: '800',
+    color: '#6366F1',
+  },
+  displayName: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#F1F1FF',
+    textAlign: 'center',
+  },
+  emailSub: {
+    color: '#9090B0',
+    textAlign: 'center',
+    marginTop: 4,
+    marginBottom: 32,
+    fontSize: 13,
+  },
+  signOutBtn: {
+    marginTop: 32,
+    borderWidth: 1,
+    borderColor: 'rgba(248,113,113,0.3)',
+    borderRadius: 12,
+    padding: 15,
+    alignItems: 'center',
+    backgroundColor: 'rgba(248,113,113,0.08)',
+  },
+  signOutText: { color: '#F87171', fontWeight: '700', fontSize: 15 },
+  loginTitle: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: '#F1F1FF',
+    letterSpacing: -0.5,
+    marginBottom: 6,
+  },
+  loginSub: {
+    color: '#5A5A78',
+    fontSize: 14,
+    marginBottom: 32,
+  },
+  input: {
+    backgroundColor: '#10101E',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 12,
+    padding: 15,
+    marginBottom: 12,
+    fontSize: 15,
+    color: '#F1F1FF',
+  },
+  errorText: {
+    color: '#F87171',
+    fontSize: 13,
+    marginBottom: 10,
+  },
+  primaryBtn: {
+    backgroundColor: '#6366F1',
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  primaryBtnText: { color: '#fff', fontWeight: '800', fontSize: 15 },
+  googleBtn: {
+    backgroundColor: '#10101E',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  googleBtnText: { color: '#C4C4E0', fontWeight: '600', fontSize: 15 },
+  switchText: {
+    textAlign: 'center',
+    color: '#6366F1',
+    fontWeight: '600',
+    fontSize: 14,
+  },
 });

@@ -6,6 +6,23 @@ import type { App } from '../lib/types';
 import FileUpload from '../components/FileUpload';
 import VersionHistory from './VersionHistory';
 
+async function sendUpdateNotification(appName: string, version: string) {
+  await fetch('https://onesignal.com/api/v1/notifications', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Key ${import.meta.env.VITE_ONESIGNAL_API_KEY}`,
+    },
+    body: JSON.stringify({
+      app_id: import.meta.env.VITE_ONESIGNAL_APP_ID,
+      included_segments: ['All'],
+      headings: { en: `${appName} güncellendi` },
+      contents: { en: `Yeni sürüm v${version} yayında!` },
+      android_channel_id: 'updates',
+    }),
+  });
+}
+
 const emptyApp: Omit<App, 'id'> = {
   name: '', packageName: '', description: '', iconUrl: '',
   category: '', currentVersion: '', currentVersionCode: 0,
@@ -44,6 +61,9 @@ export default function AppForm() {
       } else {
         await setDoc(doc(db, 'apps', id!), data, { merge: true });
         await addVersionRecord(id!);
+        if (form.status === 'published' && form.currentVersion) {
+          sendUpdateNotification(form.name, form.currentVersion).catch(() => {});
+        }
         setSaved(true);
         setTimeout(() => setSaved(false), 2000);
       }
