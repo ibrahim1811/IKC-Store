@@ -4,6 +4,7 @@ import { doc, getDoc, setDoc, addDoc, collection, serverTimestamp, Timestamp } f
 import { db } from '../lib/firebase';
 import type { App } from '../lib/types';
 import FileUpload from '../components/FileUpload';
+import { deleteFromR2 } from '../lib/r2';
 import VersionHistory from './VersionHistory';
 
 async function sendUpdateNotification(appName: string, version: string) {
@@ -190,7 +191,14 @@ export default function AppForm() {
                       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
                       Mevcut APK · {form.apkSize ? `${(form.apkSize / 1024 / 1024).toFixed(1)} MB` : ''}
                     </a>
-                    <button onClick={() => { set('apkUrl', ''); set('apkSize', 0); }} style={S.ssRemove}>×</button>
+                    <button
+                      onClick={async () => {
+                        if (!confirm('APK dosyası R2\'den silinecek. Emin misin?')) return;
+                        try { await deleteFromR2(form.apkUrl); } catch { /* R2 erişim yoksa sadece form temizle */ }
+                        set('apkUrl', ''); set('apkSize', 0);
+                      }}
+                      style={S.ssRemove}
+                    >×</button>
                   </div>
                 )}
               </Section>
