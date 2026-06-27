@@ -1,9 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, Image, ScrollView, TouchableOpacity,
   StyleSheet, ActivityIndicator, Dimensions, StatusBar,
 } from 'react-native';
-import { useRoute } from '@react-navigation/native';
+import { useRoute, useFocusEffect } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
 import { fetchApp, toggleFavorite, checkFavorite, type AppData } from '../services/firebase';
 import { downloadApk } from '../services/download';
@@ -28,13 +28,15 @@ export default function AppDetailScreen() {
     checkFavorite(route.params.appId).then(setFavorited);
   }, [route.params.appId]);
 
-  useEffect(() => {
-    if (!app) return;
-    InstalledApps.getApps().then((list: any[]) => {
-      const found = list.find(a => a.packageName === app.packageName);
-      setInstalledVersionCode(found ? found.versionCode : null);
-    }).catch(() => {});
-  }, [app]);
+  useFocusEffect(
+    useCallback(() => {
+      if (!app) return;
+      InstalledApps.getApps().then((list: any[]) => {
+        const found = list.find((a: any) => a.packageName === app.packageName);
+        setInstalledVersionCode(found ? found.versionCode : null);
+      }).catch(() => {});
+    }, [app])
+  );
 
   if (!app) return (
     <View style={styles.loadWrap}>
